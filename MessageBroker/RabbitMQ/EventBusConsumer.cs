@@ -15,11 +15,11 @@ namespace MessageBroker.RabbitMQ
     public sealed class EventBusConsumer : IEventBusConsumer, IDisposable
     {
         private static readonly Logger logger = LogManager.GetLogger(typeof(EventBusConsumer).FullName);
-        const string BROKER_NAME = "event_bus";
+        const string BROKER_NAME = "app_event_bus";
         private readonly IRabbitMQPersistentConnection _persistentConnection;
         private readonly IEventBusSubscriptionsManager _subsManager;
         private readonly ILifetimeScope _autofac;
-        private readonly string AUTOFAC_SCOPE_NAME = "event_bus";
+        private readonly string AUTOFAC_SCOPE_NAME = "message_broker_consumer";
         private IModel _consumerChannel;
         private string _queueName;
         private readonly uint _prefetchSize;

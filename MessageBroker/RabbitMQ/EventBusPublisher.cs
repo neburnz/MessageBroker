@@ -14,7 +14,7 @@ namespace MessageBroker.RabbitMQ
 {
     public class EventBusPublisher : IEventBusPublisher
     {
-        const string BROKER_NAME = "event_bus";
+        const string BROKER_NAME = "app_event_bus";
         private readonly IRabbitMQPersistentConnection _persistentConnection;
         private readonly int _retryCount;
 
