@@ -243,6 +243,8 @@ namespace MessageBroker.RabbitMQ
                         var integrationEvent = JsonConvert.DeserializeObject(message, eventType);
                         logger.Debug("Se obtiene el integrationEvent a través de la deserialización del message: {}", integrationEvent);
                         var handler = scope.ResolveOptional(subscription.HandlerType);
+                        if (handler == null)
+                            logger.Error($"No se ha registrado el handler {subscription.HandlerType} para el evento {eventType}");
                         logger.Debug("Se obtiene la instancia del handler del contenedor: {}", handler);
                         var concreteType = typeof(IIntegrationEventHandler<>).MakeGenericType(eventType);
                         logger.Debug("Se obtiene el concreteType del IntegrationEventHandler: {}", concreteType);

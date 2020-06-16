@@ -20,4 +20,8 @@
     <ProjectReference Include="..\MessageBroker\MessageBroker.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="NLog.config" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

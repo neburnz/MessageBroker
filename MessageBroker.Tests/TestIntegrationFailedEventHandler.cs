@@ -7,10 +7,9 @@ namespace MessageBroker.Tests.Events
 {
     public class TestIntegrationFailedEventHandler: IIntegrationEventHandler<TestIntegrationEvent>
     {
-        private readonly Logger logger;
-        public TestIntegrationFailedEventHandler(Logger logger)
+        private static readonly Logger logger = LogManager.GetLogger(typeof(TestIntegrationFailedEventHandler).FullName);
+        public TestIntegrationFailedEventHandler()
         {
-            this.logger = logger;
         }
         public Task Handle(TestIntegrationEvent @event)
         {

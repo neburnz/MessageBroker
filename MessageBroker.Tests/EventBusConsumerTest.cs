@@ -4,16 +4,16 @@ using Docker.DotNet;
 using Docker.DotNet.Models;
 using RabbitMQ.Client;
 using Xunit;
+using MessageBroker.Abstractions;
 using MessageBroker.RabbitMQ;
 using MessageBroker.Tests.Events;
 using System.Threading.Tasks;
 using Autofac;
 using NLog;
-using MessageBroker.Abstractions;
 
-namespace SIFACE.Messaging.Tests
+namespace MessageBroker.Tests
 {
-    public class EventBusPublisherTest : IDisposable
+    public class EventBusConsumerTest : IDisposable
     {
         private readonly string HOST_NAME = "localhost";
         private readonly string VIRTUAL_HOST = "/";
@@ -21,11 +21,10 @@ namespace SIFACE.Messaging.Tests
         private readonly string PASSWORD = "AppU$3r";
         private readonly int PORT = 5672;
         private readonly string QUEUE_NAME = "app_queue";
-        private ConnectionFactory factory;
         private IContainer container;
         IRabbitMQPersistentConnection connection;
         IModel channel;
-        public EventBusPublisherTest()
+        public EventBusConsumerTest()
         {
             StartMessageBrokerContainer().Wait();
 
@@ -39,15 +38,20 @@ namespace SIFACE.Messaging.Tests
                 Port = Convert.ToInt16(PORT)
             }).As<IConnectionFactory>();
             builder.RegisterType<DefaultRabbitMQPersistentConnection>().As<IRabbitMQPersistentConnection>().SingleInstance();
+            builder.RegisterType<InMemoryEventBusSubscriptionsManager>().As<IEventBusSubscriptionsManager>().SingleInstance();
+            builder.Register(context =>
+                new EventBusConsumer(
+                    context.Resolve<IRabbitMQPersistentConnection>(),
+                    context.Resolve<ILifetimeScope>(),
+                    context.Resolve<IEventBusSubscriptionsManager>(),
+                    QUEUE_NAME))
+                .As<IEventBusConsumer>()
+                .PropertiesAutowired()
+                .SingleInstance();
             builder.RegisterType<EventBusPublisher>().As<IEventBusPublisher>().PropertiesAutowired();
+            builder.RegisterType<TestIntegrationEventHandler>();
+            builder.RegisterType<TestIntegrationFailedEventHandler>();
             container = builder.Build();
-            
-            factory = new ConnectionFactory();
-            factory.HostName = HOST_NAME;
-            factory.VirtualHost = VIRTUAL_HOST;
-            factory.UserName = USER_NAME;
-            factory.Password = PASSWORD;
-            factory.Port = PORT;
 
             connection = container.Resolve<IRabbitMQPersistentConnection>();
             connection.TryConnect();
@@ -102,22 +106,47 @@ namespace SIFACE.Messaging.Tests
             {
                 connection.Dispose();
             }
+
             StopMessageBrokerContainer().Wait();
         }
 
         [Fact]
-        public void When_Publish_Queue_Is_Not_Empty()
+        public void When_Consumer_Raises_Exception_Then_Event_Is_Requeued()
         {
             // Arrange
+            var response = channel.QueueDeclarePassive(QUEUE_NAME);
+            var publisher = container.Resolve<IEventBusPublisher>();
             var @event = new TestIntegrationEvent();
-            var target = container.Resolve<IEventBusPublisher>();
+            publisher.Publish(@event);
 
             // Act
-            target.Publish(@event);
-            
+            try
+            {
+                var target = container.Resolve<IEventBusConsumer>();
+                target.Subscribe<TestIntegrationEvent, TestIntegrationFailedEventHandler>();
+                Assert.Equal(0u, response.MessageCount);
+            }
+            catch (AggregateException)
+            {
+                // Assert
+                Assert.Equal(1u, response.MessageCount);
+            }
+        }
+        [Fact]
+        public void When_Handler_Is_Executed_Then_Event_Is_Consumed()
+        {
+            // Arrange
+            var publisher = container.Resolve<IEventBusPublisher>();
+            var @event = new TestIntegrationEvent();
+            publisher.Publish(@event);
+
+            // Act
+            var target = container.Resolve<IEventBusConsumer>();
+            target.Subscribe<TestIntegrationEvent, TestIntegrationEventHandler>();
+
             // Assert
             var response = channel.QueueDeclarePassive(QUEUE_NAME);
-            Assert.Equal(1u, response.MessageCount);
+            Assert.Equal(0u, response.MessageCount);
         }
     }
 }
